@@ -1633,6 +1633,23 @@ class Map extends Camera {
         }
     }
 
+    /**
+     * Load an additional [sprite](https://docs.mapbox.com/help/glossary/sprite/) to the style. Theses images will available like any others images
+     * A {@link Map.event:error} event will be fired if there is not enough space in the sprite to add this image.
+     *
+     * @param url The base URL of the sprite to be loaded.
+     *
+     * @example
+     * // Load an additional sprite to the style
+     * map.loadSprite('mapbox://sprites/examples/cjikt35x83t1z2rnxpdmjs7y7', function(error) {
+     *    if (error) throw error;
+     * });
+     *
+     */
+    loadSprite(url: string) {
+        this.style.loadSprite(url);
+    }
+
     // eslint-disable-next-line jsdoc/require-returns
     /**
      * Update an existing image in a style. This image can be displayed on the map like any other icon in the style's

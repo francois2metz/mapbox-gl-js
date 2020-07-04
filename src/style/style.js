@@ -112,7 +112,7 @@ class Style extends Evented {
     light: Light;
 
     _request: ?Cancelable;
-    _spriteRequest: ?Cancelable;
+    _spriteRequests: Array<Cancelable>;
     _layers: {[_: string]: StyleLayer};
     _serializedLayers: {[_: string]: Object};
     _order: Array<string>;
@@ -157,6 +157,7 @@ class Style extends Evented {
         this.zoomHistory = new ZoomHistory();
         this._loaded = false;
         this._availableImages = [];
+        this.spriteRequests = [];
 
         this._resetUpdates();
 
@@ -254,7 +255,7 @@ class Style extends Evented {
         }
 
         if (json.sprite) {
-            this._loadSprite(json.sprite);
+            this.loadSprite(json.sprite);
         } else {
             this.imageManager.setLoaded(true);
         }
@@ -281,9 +282,9 @@ class Style extends Evented {
         this.fire(new Event('style.load'));
     }
 
-    _loadSprite(url: string) {
-        this._spriteRequest = loadSprite(url, this.map._requestManager, (err, images) => {
-            this._spriteRequest = null;
+    loadSprite(url: string, callback: Function) {
+        const request = loadSprite(url, this.map._requestManager, (err, images) => {
+            this._spriteRequests.splice(this._spriteRequests.indexOf(request), 1);
             if (err) {
                 this.fire(new ErrorEvent(err));
             } else if (images) {
@@ -296,7 +297,11 @@ class Style extends Evented {
             this._availableImages = this.imageManager.listImages();
             this.dispatcher.broadcast('setImages', this._availableImages);
             this.fire(new Event('data', {dataType: 'style'}));
+            if (callback) {
+                callback(err);
+            }
         });
+        this._spriteRequests.push(request);
     }
 
     _validateLayer(layer: StyleLayer) {
@@ -1208,10 +1213,10 @@ class Style extends Evented {
             this._request.cancel();
             this._request = null;
         }
-        if (this._spriteRequest) {
-            this._spriteRequest.cancel();
-            this._spriteRequest = null;
+        for (const request in this._spriteRequests) {
+            request.cancel();
         }
+        this._spriteRequests = [];
         rtlTextPluginEvented.off('pluginStateChange', this._rtlTextPluginCallback);
         for (const layerId in this._layers) {
             const layer: StyleLayer = this._layers[layerId];

@@ -272,6 +272,63 @@ test('Style#loadJSON', (t) => {
         });
     });
 
+    t.test('load an additional sprite', (t) => {
+        window.useFakeXMLHttpRequest();
+
+        // Stubbing to bypass Web APIs that supported by jsdom:
+        // * `URL.createObjectURL` in ajax.getImage (https://github.com/tmpvar/jsdom/issues/1721)
+        // * `canvas.getContext('2d')` in browser.getImageData
+        t.stub(window.URL, 'revokeObjectURL');
+        t.stub(browser, 'getImageData');
+        // stub Image so we can invoke 'onload'
+        // https://github.com/jsdom/jsdom/commit/58a7028d0d5b6aacc5b435daee9fd8f9eacbb14c
+        const img = {};
+        t.stub(window, 'Image').returns(img);
+        // stub this manually because sinon does not stub non-existent methods
+        assert(!window.URL.createObjectURL);
+        window.URL.createObjectURL = () => 'blob:';
+        t.tearDown(() => delete window.URL.createObjectURL);
+
+        // fake the image request (sinon doesn't allow non-string data for
+        // server.respondWith, so we do so manually)
+        const requests = [];
+        window.XMLHttpRequest.onCreate = req => { requests.push(req); };
+        const respond = () => {
+            let req = requests.find(req => req.url === 'http://example.com/sprite.png');
+            req.setStatus(200);
+            req.response = new ArrayBuffer(8);
+            req.onload();
+            img.onload();
+
+            req = requests.find(req => req.url === 'http://example.com/sprite.json');
+            req.setStatus(200);
+            req.response = '{}';
+            req.onload();
+        };
+
+        const style = new Style(new StubMap());
+
+        style.loadSprite('http://example.com/sprite', (err) => {
+            t.ok(err === null);
+            t.end();
+        });
+
+        style.once('error', (e) => t.error(e));
+
+        style.once('data', (e) => {
+            t.equal(e.target, style);
+            t.equal(e.dataType, 'style');
+
+            style.once('data', (e) => {
+                t.equal(e.target, style);
+                t.equal(e.dataType, 'style');
+                t.end();
+            });
+
+            respond();
+        });
+    });
+
     t.test('validates the style', (t) => {
         const style = new Style(new StubMap());
 
